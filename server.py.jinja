@@ -119,7 +119,7 @@ def batch_embed(texts: str) -> str:
 # Create Thinkube-styled Gradio interface
 thinkube_theme = create_thinkube_theme()
 
-with gr.Blocks(theme=thinkube_theme, css=THINKUBE_CSS) as demo:
+with gr.Blocks() as demo:
     gr.Markdown(f"# {{ project_title | default(project_name) }}")
     gr.Markdown(f"Text embeddings powered by **{MODEL_ID}** via TEI")
 
@@ -191,12 +191,14 @@ async def health_check():
             "error": str(e)
         }
 
-# Mount Gradio app
+# Mount Gradio app with theme (gradio 5.x moved theme/css from Blocks to mount)
 app = gr.mount_gradio_app(
     app,
     demo,
     path="/",
-    favicon_path="/app/icons/tk_ai.png"
+    favicon_path="/app/icons/tk_ai.png",
+    theme=thinkube_theme,
+    css=THINKUBE_CSS
 )
 
 if __name__ == "__main__":
