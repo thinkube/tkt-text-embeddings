@@ -7,7 +7,7 @@ spec:
   containers:
     - name: embeddings
       build: .
-      port: 8355
+      port: 7860
       size: xlarge
       gpu:
         count: 1

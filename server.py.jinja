@@ -1,0 +1,208 @@
+#!/usr/bin/env python3
+"""
+Text Embeddings Gradio UI
+Provides a web interface for testing text embeddings using TEI backend
+"""
+
+import os
+import json
+import requests
+import numpy as np
+import gradio as gr
+from fastapi import FastAPI
+import uvicorn
+from thinkube_theme import create_thinkube_theme, THINKUBE_CSS
+
+# Configuration
+MODEL_ID = "{{ model_id }}"
+TEI_URL = "http://localhost:8355"
+
+# Initialize FastAPI app
+app = FastAPI(title="{{ project_name }} Text Embeddings Server")
+
+def get_embedding(text: str) -> tuple[str, str]:
+    """Get embedding vector for a single text"""
+    try:
+        response = requests.post(
+            f"{TEI_URL}/embed",
+            json={"inputs": text},
+            timeout=30
+        )
+        response.raise_for_status()
+        embedding = response.json()[0]
+
+        # Format output
+        vector_preview = f"[{', '.join(f'{x:.4f}' for x in embedding[:10])}... ]"
+        stats = f"Dimension: {len(embedding)}\nMagnitude: {np.linalg.norm(embedding):.4f}"
+
+        return vector_preview, stats
+    except Exception as e:
+        return f"Error: {str(e)}", ""
+
+def compare_texts(text1: str, text2: str) -> tuple[str, str, str]:
+    """Compare two texts and show similarity"""
+    try:
+        response = requests.post(
+            f"{TEI_URL}/embed",
+            json={"inputs": [text1, text2]},
+            timeout=30
+        )
+        response.raise_for_status()
+        embeddings = response.json()
+
+        # Calculate cosine similarity
+        vec1 = np.array(embeddings[0])
+        vec2 = np.array(embeddings[1])
+        similarity = np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
+
+        # Format outputs
+        similarity_str = f"Cosine Similarity: {similarity:.4f}"
+        interpretation = get_similarity_interpretation(similarity)
+
+        return similarity_str, interpretation, f"Embedding dimension: {len(vec1)}"
+    except Exception as e:
+        return f"Error: {str(e)}", "", ""
+
+def get_similarity_interpretation(similarity: float) -> str:
+    """Interpret similarity score"""
+    if similarity >= 0.9:
+        return "Very similar (nearly identical meaning)"
+    elif similarity >= 0.7:
+        return "Similar (related topics)"
+    elif similarity >= 0.5:
+        return "Somewhat similar (some overlap)"
+    elif similarity >= 0.3:
+        return "Low similarity (different topics)"
+    else:
+        return "Very different (unrelated)"
+
+def batch_embed(texts: str) -> str:
+    """Embed multiple texts (one per line) and show results"""
+    try:
+        lines = [line.strip() for line in texts.strip().split('\n') if line.strip()]
+        if not lines:
+            return "Please enter at least one text"
+
+        response = requests.post(
+            f"{TEI_URL}/embed",
+            json={"inputs": lines},
+            timeout=60
+        )
+        response.raise_for_status()
+        embeddings = response.json()
+
+        # Build similarity matrix
+        n = len(embeddings)
+        results = [f"Processed {n} texts, dimension: {len(embeddings[0])}\n"]
+        results.append("Pairwise Similarity Matrix:")
+
+        # Header
+        header = "     " + "".join(f"  T{i+1}  " for i in range(min(n, 5)))
+        results.append(header)
+
+        for i in range(min(n, 5)):
+            row = f"T{i+1}  "
+            for j in range(min(n, 5)):
+                vec1 = np.array(embeddings[i])
+                vec2 = np.array(embeddings[j])
+                sim = np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
+                row += f" {sim:.2f} "
+            results.append(row)
+
+        if n > 5:
+            results.append(f"... (showing first 5 of {n} texts)")
+
+        return '\n'.join(results)
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+# Create Thinkube-styled Gradio interface
+thinkube_theme = create_thinkube_theme()
+
+with gr.Blocks(theme=thinkube_theme, css=THINKUBE_CSS, title="{{ project_name }}") as demo:
+    gr.Markdown(f"# {{ project_title | default(project_name) }}")
+    gr.Markdown(f"Text embeddings powered by **{MODEL_ID}** via TEI")
+
+    with gr.Tabs():
+        with gr.TabItem("Single Text"):
+            with gr.Row():
+                with gr.Column():
+                    text_input = gr.Textbox(
+                        label="Enter text",
+                        placeholder="Type or paste text to embed...",
+                        lines=3
+                    )
+                    embed_btn = gr.Button("Get Embedding", variant="primary")
+                with gr.Column():
+                    vector_output = gr.Textbox(label="Embedding Vector (preview)", lines=2)
+                    stats_output = gr.Textbox(label="Statistics", lines=2)
+
+            embed_btn.click(get_embedding, inputs=[text_input], outputs=[vector_output, stats_output])
+
+        with gr.TabItem("Compare Texts"):
+            with gr.Row():
+                text1 = gr.Textbox(label="Text 1", placeholder="First text...", lines=3)
+                text2 = gr.Textbox(label="Text 2", placeholder="Second text...", lines=3)
+            compare_btn = gr.Button("Compare", variant="primary")
+            with gr.Row():
+                similarity_output = gr.Textbox(label="Similarity Score")
+                interpretation_output = gr.Textbox(label="Interpretation")
+                dim_output = gr.Textbox(label="Info")
+
+            compare_btn.click(compare_texts, inputs=[text1, text2],
+                            outputs=[similarity_output, interpretation_output, dim_output])
+
+            gr.Examples(
+                examples=[
+                    ["The cat sat on the mat.", "A feline rested on the rug."],
+                    ["Machine learning is a subset of AI.", "Deep learning uses neural networks."],
+                    ["I love programming in Python.", "The weather is nice today."],
+                ],
+                inputs=[text1, text2]
+            )
+
+        with gr.TabItem("Batch Embed"):
+            batch_input = gr.Textbox(
+                label="Enter texts (one per line)",
+                placeholder="Text 1\nText 2\nText 3\n...",
+                lines=8
+            )
+            batch_btn = gr.Button("Process Batch", variant="primary")
+            batch_output = gr.Textbox(label="Results", lines=12)
+
+            batch_btn.click(batch_embed, inputs=[batch_input], outputs=[batch_output])
+
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    try:
+        # Check TEI backend health
+        response = requests.get(f"{TEI_URL}/health", timeout=5)
+        tei_healthy = response.status_code == 200
+        return {
+            "status": "healthy" if tei_healthy else "degraded",
+            "model": MODEL_ID,
+            "tei_backend": "healthy" if tei_healthy else "unhealthy",
+            "engine": "TEI + Gradio"
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "error": str(e)
+        }
+
+# Mount Gradio app
+app = gr.mount_gradio_app(
+    app,
+    demo,
+    path="/",
+    favicon_path="/app/icons/tk_ai.png"
+)
+
+if __name__ == "__main__":
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=7860,
+        log_level="info",
+    )

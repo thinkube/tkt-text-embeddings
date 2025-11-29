@@ -5,17 +5,27 @@ FROM {{ container_registry }}/library/text-embeddings-inference-base:1.5-blackwe
 # - CUDA 13.0 runtime
 # - Configured for Blackwell (sm_121a)
 
-# Install Python for MLflow model discovery
+# Install Python and Gradio dependencies
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
-    && pip3 install --no-cache-dir --break-system-packages requests \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy entrypoint script
+# Copy and install requirements
+COPY requirements.txt /app/requirements.txt
+RUN pip3 install --no-cache-dir --break-system-packages -r /app/requirements.txt
+
+# Copy application files
 COPY entrypoint.sh /app/entrypoint.sh
+COPY server.py /app/server.py
+COPY thinkube_theme.py /app/thinkube_theme.py
 RUN chmod +x /app/entrypoint.sh
+
+# Copy assets
+RUN mkdir -p /app/icons
+COPY tk_ai.png /app/icons/tk_ai.png
+COPY tk_ai.svg /app/icons/tk_ai.svg
 
 # Switch back to non-root user
 USER tei
@@ -24,8 +34,8 @@ WORKDIR /app
 # Model ID passed as environment variable at deployment time
 # Not baked into the image to enable image reuse across deployments
 
-# Expose port: 8355 for OpenAI-compatible embeddings API
-EXPOSE 8355
+# Expose ports: 8355 for TEI API, 7860 for Gradio UI
+EXPOSE 8355 7860
 
 # Run the entrypoint script
 ENTRYPOINT ["/app/entrypoint.sh"]
