@@ -1,0 +1,19 @@
+apiVersion: thinkube.io/v1
+kind: TemplateManifest
+metadata:
+  name: tkt-text-embeddings
+  title: Text Embeddings Server (TEI + MLflow)
+  description: High-performance text embeddings using Hugging Face TEI (Rust), loading models from MLflow Model Registry
+  version: 1.0.0
+  author: Alejandro Martinez Corria
+  tags: ["ai", "embeddings", "rag", "mlflow", "text-embeddings", "tei", "huggingface"]
+
+parameters:
+  - name: model_id
+    type: choice
+    description: Select a downloaded embedding model
+    dynamic_source: "model_catalog"
+    filter:
+      server_type: "text-embeddings"
+      is_downloaded: true
+    default: "nomic-ai/nomic-embed-text-v1.5"

@@ -1,0 +1,31 @@
+FROM {{ container_registry }}/library/text-embeddings-inference-base:1.5-blackwell
+
+# TEI base image already has:
+# - text-embeddings-router binary
+# - CUDA 13.0 runtime
+# - Configured for Blackwell (sm_121a)
+
+# Install Python for MLflow model discovery
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    && pip3 install --no-cache-dir --break-system-packages requests \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy entrypoint script
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# Switch back to non-root user
+USER tei
+WORKDIR /app
+
+# Model ID passed as environment variable at deployment time
+# Not baked into the image to enable image reuse across deployments
+
+# Expose port: 8355 for OpenAI-compatible embeddings API
+EXPOSE 8355
+
+# Run the entrypoint script
+ENTRYPOINT ["/app/entrypoint.sh"]
