@@ -1,6 +1,10 @@
-# Gradio UI dependencies
-gradio>=4.0.0
-fastapi
-uvicorn
-requests
-numpy
+# Text Embeddings - TEI backend with Gradio UI
+
+# Requests - For HTTP requests (Keycloak authentication, TEI API)
+requests>=2.28.0
+
+# Gradio - Web UI with theming support (match tensorrt-llm version)
+gradio>=4.42.0
+
+# NumPy - For embedding vector operations
+numpy>=1.24.0

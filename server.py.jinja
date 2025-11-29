@@ -119,7 +119,7 @@ def batch_embed(texts: str) -> str:
 # Create Thinkube-styled Gradio interface
 thinkube_theme = create_thinkube_theme()
 
-with gr.Blocks(css=THINKUBE_CSS) as demo:
+with gr.Blocks(theme=thinkube_theme, css=THINKUBE_CSS) as demo:
     gr.Markdown(f"# {{ project_title | default(project_name) }}")
     gr.Markdown(f"Text embeddings powered by **{MODEL_ID}** via TEI")
 
