@@ -8,7 +8,7 @@ spec:
     - name: embeddings
       build: .
       port: 8355
-      size: medium
+      size: xlarge
       gpu:
         count: 1
         memory: "8Gi"  # Embedding models are small, 8Gi is sufficient
