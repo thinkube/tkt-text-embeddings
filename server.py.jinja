@@ -6,10 +6,12 @@ Provides a web interface for testing text embeddings using TEI backend
 
 import os
 import json
+import time
 import requests
 import numpy as np
 import gradio as gr
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 import uvicorn
 from thinkube_theme import create_thinkube_theme, THINKUBE_CSS
 
@@ -190,6 +192,70 @@ async def health_check():
             "status": "unhealthy",
             "error": str(e)
         }
+
+
+# ============================================================================
+# OpenAI-Compatible API Endpoints (for LiteLLM integration)
+# ============================================================================
+
+@app.post("/v1/embeddings")
+async def openai_embeddings(request: Request):
+    """OpenAI-compatible embeddings endpoint - proxies to TEI backend"""
+    try:
+        body = await request.json()
+
+        # OpenAI uses 'input', TEI uses 'inputs'
+        inputs = body.get('input', body.get('inputs', []))
+        if isinstance(inputs, str):
+            inputs = [inputs]
+
+        # Forward to TEI backend
+        response = requests.post(
+            f"{TEI_URL}/embed",
+            json={"inputs": inputs},
+            timeout=60
+        )
+        response.raise_for_status()
+        embeddings = response.json()
+
+        # Format as OpenAI response
+        return JSONResponse({
+            "object": "list",
+            "data": [
+                {"object": "embedding", "index": i, "embedding": emb}
+                for i, emb in enumerate(embeddings)
+            ],
+            "model": MODEL_ID,
+            "usage": {"prompt_tokens": 0, "total_tokens": 0}
+        })
+    except requests.exceptions.RequestException as e:
+        return JSONResponse(
+            status_code=503,
+            content={"error": {"message": f"TEI backend error: {str(e)}", "type": "backend_error"}}
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": {"message": str(e), "type": "internal_error"}}
+        )
+
+
+@app.get("/v1/models")
+async def openai_models():
+    """OpenAI-compatible models endpoint - returns available embedding model"""
+    return JSONResponse({
+        "object": "list",
+        "data": [{
+            "id": MODEL_ID,
+            "object": "model",
+            "created": int(time.time()),
+            "owned_by": "thinkube",
+            "permission": [],
+            "root": MODEL_ID,
+            "parent": None
+        }]
+    })
+
 
 # Mount Gradio app with theme (gradio 5.x moved theme/css from Blocks to mount)
 app = gr.mount_gradio_app(
