@@ -99,9 +99,10 @@ fi
 echo "Using model path: $MODEL_PATH"
 export MODEL_PATH
 
-# Ensure config.json contains model_type (required by TEI router).
-# Some HuggingFace models (e.g. jina-embeddings-v3) omit this field,
-# causing TEI to fail with "missing field `model_type`".
+# Patch config.json for TEI compatibility.
+# Known issues with some HuggingFace models (e.g. jina-embeddings-v3):
+# 1. Missing "model_type" field (TEI requires it)
+# 2. "position_embedding_type": "rotary" — TEI Candle expects "rope"
 # The MLflow volume may be read-only, so we create a writable overlay:
 # symlink all model files into /tmp/model, then write a patched config.json.
 PATCHED_MODEL_PATH=$(python3 << PATCH_CONFIG
@@ -110,29 +111,39 @@ import json, pathlib, os, sys
 src = pathlib.Path("$MODEL_PATH")
 cfg_path = src / "config.json"
 if not cfg_path.exists():
-    # No config to patch — use original path
     print(str(src))
     sys.exit(0)
 
 cfg = json.loads(cfg_path.read_text())
-if "model_type" in cfg:
-    print(f"config.json already has model_type={cfg['model_type']!r}", file=sys.stderr)
-    print(str(src))
-    sys.exit(0)
+patched = False
 
-# Derive model_type from architectures
-arch_map = {
-    "XLMRobertaModel": "xlm-roberta",
-    "BertModel": "bert",
-    "RobertaModel": "roberta",
-    "DistilBertModel": "distilbert",
-    "CamembertModel": "camembert",
-    "AlbertModel": "albert",
-}
-arch = cfg.get("architectures", [""])[0]
-model_type = arch_map.get(arch)
-if not model_type:
-    print(f"WARNING: unknown architecture {arch!r}, cannot infer model_type", file=sys.stderr)
+# 1. Add model_type if missing
+if "model_type" not in cfg:
+    arch_map = {
+        "XLMRobertaModel": "xlm-roberta",
+        "BertModel": "bert",
+        "RobertaModel": "roberta",
+        "DistilBertModel": "distilbert",
+        "CamembertModel": "camembert",
+        "AlbertModel": "albert",
+    }
+    arch = cfg.get("architectures", [""])[0]
+    model_type = arch_map.get(arch)
+    if model_type:
+        cfg["model_type"] = model_type
+        patched = True
+        print(f"  + model_type={model_type!r} (from {arch})", file=sys.stderr)
+
+# 2. Normalize position_embedding_type for TEI Candle backend
+pet = cfg.get("position_embedding_type")
+pet_map = {"rotary": "rope"}
+if pet in pet_map:
+    cfg["position_embedding_type"] = pet_map[pet]
+    patched = True
+    print(f"  + position_embedding_type: {pet!r} -> {pet_map[pet]!r}", file=sys.stderr)
+
+if not patched:
+    print("config.json needs no patches", file=sys.stderr)
     print(str(src))
     sys.exit(0)
 
@@ -142,20 +153,16 @@ overlay.mkdir(parents=True, exist_ok=True)
 for item in src.iterdir():
     dest = overlay / item.name
     if dest.exists() or dest.is_symlink():
-        dest.unlink() if dest.is_file() or dest.is_symlink() else None
+        if dest.is_dir() and not dest.is_symlink():
+            continue
+        dest.unlink()
     if item.name == "config.json":
-        continue  # will write patched version
-    if item.is_dir():
-        # symlink subdirectories (e.g. onnx/, 1_Pooling/)
-        if dest.exists() or dest.is_symlink():
-            os.remove(str(dest))
-        os.symlink(str(item), str(dest))
-    else:
-        os.symlink(str(item), str(dest))
+        continue
+    os.symlink(str(item), str(dest))
 
-cfg["model_type"] = model_type
-(overlay / "config.json").write_text(json.dumps(cfg, indent=2) + "\n")
-print(f"Patched config.json: added model_type={model_type!r} (from {arch}), overlay at {overlay}", file=sys.stderr)
+cfg_text = json.dumps(cfg, indent=2) + "\n"
+(overlay / "config.json").write_text(cfg_text)
+print(f"Patched config.json written to {overlay}", file=sys.stderr)
 print(str(overlay))
 PATCH_CONFIG
 )
