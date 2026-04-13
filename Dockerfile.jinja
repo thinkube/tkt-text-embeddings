@@ -2,6 +2,11 @@ FROM {{ container_registry }}/library/ai-inference-base:cuda13.0-torch2.9-py3.12
 
 USER root
 
+# System libraries required by infinity-emb[all] (audio support needs libsndfile)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install Infinity embedding server and Gradio dependencies
 COPY requirements.txt /app/requirements.txt
 RUN pip3 install --no-cache-dir --break-system-packages --upgrade -r /app/requirements.txt
