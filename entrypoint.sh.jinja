@@ -105,6 +105,7 @@ infinity_emb v2 \
     --model-id "$MODEL_PATH" \
     --served-model-name "{{ model_id }}" \
     --port 8355 \
+    --url-prefix /v1 \
     --trust-remote-code \
     --no-bettertransformer \
     --log-level info &

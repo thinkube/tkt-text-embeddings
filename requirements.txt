@@ -1,7 +1,8 @@
 # Text Embeddings - Infinity backend with Gradio UI
 
-# Infinity embedding server (torch backend, flash attention)
-infinity-emb[all]>=0.0.70
+# Infinity embedding server — torch backend + server + einops (for jina-v3)
+# Do NOT use [all] — it pulls optimum which has a broken bettertransformer import
+infinity-emb[torch,server,einops]>=0.0.70
 
 # Requests - For HTTP requests (Keycloak authentication, Infinity API)
 requests>=2.28.0
