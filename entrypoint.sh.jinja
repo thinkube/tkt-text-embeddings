@@ -99,6 +99,40 @@ fi
 echo "Using model path: $MODEL_PATH"
 export MODEL_PATH
 
+# Ensure config.json contains model_type (required by TEI router).
+# Some HuggingFace models (e.g. jina-embeddings-v3) omit this field,
+# causing TEI to fail with "missing field `model_type`".
+python3 << PATCH_CONFIG
+import json, pathlib, sys
+
+cfg_path = pathlib.Path("$MODEL_PATH") / "config.json"
+if not cfg_path.exists():
+    print(f"WARNING: {cfg_path} not found, skipping model_type patch", file=sys.stderr)
+    sys.exit(0)
+
+cfg = json.loads(cfg_path.read_text())
+if "model_type" not in cfg:
+    # Derive model_type from architectures
+    arch_map = {
+        "XLMRobertaModel": "xlm-roberta",
+        "BertModel": "bert",
+        "RobertaModel": "roberta",
+        "DistilBertModel": "distilbert",
+        "CamembertModel": "camembert",
+        "AlbertModel": "albert",
+    }
+    arch = cfg.get("architectures", [""])[0]
+    model_type = arch_map.get(arch)
+    if model_type:
+        cfg["model_type"] = model_type
+        cfg_path.write_text(json.dumps(cfg, indent=2) + "\n")
+        print(f"Patched config.json: added model_type={model_type!r} (from {arch})", file=sys.stderr)
+    else:
+        print(f"WARNING: unknown architecture {arch!r}, cannot infer model_type", file=sys.stderr)
+else:
+    print(f"config.json already has model_type={cfg['model_type']!r}", file=sys.stderr)
+PATCH_CONFIG
+
 # Start TEI server in background
 echo "Starting TEI backend on port 8355..."
 text-embeddings-router \
