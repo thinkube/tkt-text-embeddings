@@ -1,6 +1,9 @@
-# Text Embeddings - TEI backend with Gradio UI
+# Text Embeddings - Infinity backend with Gradio UI
 
-# Requests - For HTTP requests (Keycloak authentication, TEI API)
+# Infinity embedding server (torch backend, flash attention)
+infinity-emb[all]>=0.0.70
+
+# Requests - For HTTP requests (Keycloak authentication, Infinity API)
 requests>=2.28.0
 
 # Gradio - Web UI (>=5.47.2 required for huggingface_hub 1.0 compatibility)
