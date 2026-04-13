@@ -99,28 +99,24 @@ fi
 echo "Using model path: $MODEL_PATH"
 export MODEL_PATH
 
-# Start Infinity embedding server in background
-echo "Starting Infinity backend on port 8355..."
-infinity_emb v2 \
+# Start TEI server in background
+echo "Starting TEI backend on port 8355..."
+text-embeddings-router \
     --model-id "$MODEL_PATH" \
-    --served-model-name "{{ model_id }}" \
     --port 8355 \
-    --url-prefix /v1 \
-    --trust-remote-code \
-    --no-bettertransformer \
-    --log-level info &
+    --hostname 0.0.0.0 &
 
-INFINITY_PID=$!
+TEI_PID=$!
 
-# Wait for Infinity to be ready
-echo "Waiting for Infinity backend to be ready..."
-for i in {1..120}; do
+# Wait for TEI to be ready
+echo "Waiting for TEI backend to be ready..."
+for i in {1..60}; do
     if curl -s http://localhost:8355/health > /dev/null 2>&1; then
-        echo "Infinity backend is ready!"
+        echo "TEI backend is ready!"
         break
     fi
-    if [ $i -eq 120 ]; then
-        echo "ERROR: Infinity backend failed to start within 120 seconds"
+    if [ $i -eq 60 ]; then
+        echo "ERROR: TEI backend failed to start within 60 seconds"
         exit 1
     fi
     sleep 1
