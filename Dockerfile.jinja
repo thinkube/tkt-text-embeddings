@@ -1,9 +1,7 @@
-FROM {{ container_registry }}/library/text-embeddings-inference-base:1.9-blackwell
+FROM {{ container_registry }}/library/text-embeddings-inference:121-latest
 
-# TEI base image already has:
-# - text-embeddings-router binary
-# - CUDA 13.0 runtime
-# - Configured for Blackwell (sm_121a)
+# Pre-built TEI image for DGX Spark (sm_121, ARM64, Blackwell GB10)
+# Includes text-embeddings-router with flash attention, CUDA 12.9
 
 # Install Python and Gradio dependencies
 USER root
@@ -27,12 +25,10 @@ RUN mkdir -p /app/icons
 COPY tk_ai.png /app/icons/tk_ai.png
 COPY tk_ai.svg /app/icons/tk_ai.svg
 
-# Switch back to non-root user
+# Create non-root user (matching UID from base image)
+RUN useradd -m -u 1001 tei || true
 USER tei
 WORKDIR /app
-
-# Model ID passed as environment variable at deployment time
-# Not baked into the image to enable image reuse across deployments
 
 # Expose ports: 8355 for TEI API, 7860 for Gradio UI
 EXPOSE 8355 7860
