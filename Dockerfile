@@ -1,4 +1,5 @@
-FROM {{ container_registry }}/library/text-embeddings-inference:121-latest
+ARG CONTAINER_REGISTRY
+FROM ${CONTAINER_REGISTRY}/library/text-embeddings-inference:121-latest
 
 # Pre-built TEI image for DGX Spark (sm_121, ARM64, Blackwell GB10)
 # Includes text-embeddings-router with flash attention, CUDA 12.9

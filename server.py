@@ -16,11 +16,13 @@ import uvicorn
 from thinkube_theme import create_thinkube_theme, THINKUBE_CSS
 
 # Configuration
-MODEL_ID = "{{ model_id }}"
+MODEL_ID = os.environ.get("MODEL_ID", "nomic-ai/nomic-embed-text-v1.5")
+APP_NAME = os.environ.get("APP_NAME", "text-embeddings")
+APP_TITLE = os.environ.get("APP_TITLE", APP_NAME)
 TEI_URL = "http://localhost:8355"
 
 # Initialize FastAPI app
-app = FastAPI(title="{{ project_name }} Text Embeddings Server")
+app = FastAPI(title=f"{APP_NAME} Text Embeddings Server")
 
 def get_embedding(text: str) -> tuple[str, str]:
     """Get embedding vector for a single text"""
@@ -122,7 +124,7 @@ def batch_embed(texts: str) -> str:
 thinkube_theme = create_thinkube_theme()
 
 with gr.Blocks() as demo:
-    gr.Markdown(f"# {{ project_title | default(project_name) }}")
+    gr.Markdown(f"# {APP_TITLE}")
     gr.Markdown(f"Text embeddings powered by **{MODEL_ID}** via TEI")
 
     with gr.Tabs():

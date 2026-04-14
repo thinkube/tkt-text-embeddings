@@ -1,8 +1,10 @@
 #!/bin/bash
 set -e
 
+MODEL_ID="${MODEL_ID:?MODEL_ID environment variable is required}"
+
 echo "=== Text Embeddings Server Startup ==="
-echo "Model: {{ model_id }}"
+echo "Model: ${MODEL_ID}"
 
 # Configure HuggingFace to use local models only (no network access)
 # Models are stored in MLflow artifacts on JuiceFS at /mlflow-models/artifacts/{run_id}/artifacts/model
@@ -38,7 +40,7 @@ token_response.raise_for_status()
 access_token = token_response.json()['access_token']
 
 # Query MLflow for model
-model_id = "{{ model_id }}"
+model_id = os.environ['MODEL_ID']
 model_name = model_id.replace('/', '-')
 mlflow_url = os.environ.get('MLFLOW_TRACKING_URI', 'http://mlflow.mlflow.svc.cluster.local:5000')
 
