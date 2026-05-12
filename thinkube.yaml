@@ -8,7 +8,7 @@ spec:
     replicas: 0
 
   containers:
-    - name: embeddings
+    - name: inference
       build: .
       port: 7860
       size: xlarge
@@ -21,4 +21,4 @@ spec:
 
   routes:
     - path: /
-      to: embeddings
+      to: inference
