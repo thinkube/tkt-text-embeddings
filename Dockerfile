@@ -1,8 +1,12 @@
 ARG CONTAINER_REGISTRY
-FROM ${CONTAINER_REGISTRY}/library/text-embeddings-inference:121-latest
+ARG TARGETARCH
 
-# Pre-built TEI image for DGX Spark (sm_121, ARM64, Blackwell GB10)
-# Includes text-embeddings-router with flash attention, CUDA 12.9
+# Select TEI base image per architecture:
+#   - amd64: sm_86 (Ampere: RTX 3090, A100, etc.)
+#   - arm64: sm_121 (Blackwell: DGX Spark GB10)
+FROM ${CONTAINER_REGISTRY}/library/text-embeddings-inference:86-latest AS base-amd64
+FROM ${CONTAINER_REGISTRY}/library/text-embeddings-inference:121-latest AS base-arm64
+FROM base-${TARGETARCH}
 
 # Install Python and Gradio dependencies
 USER root
