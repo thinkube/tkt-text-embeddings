@@ -3,7 +3,9 @@ kind: ThinkubeDeployment
 
 spec:
   deployment:
-    type: app
+    type: component
+    name: text-embeddings
+    replicas: 0
 
   containers:
     - name: embeddings
