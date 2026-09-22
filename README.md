@@ -69,7 +69,7 @@ mirrored once into MLflow.
 
 Load the model on the node you choose. The LLM Gateway creates the serving
 pod and registers the model. The docs page
-[*Load a model on the node and context you choose*](https://github.com/thinkube/thinkube.org/blob/main/modules/ROOT/pages/playbooks/load-a-model-on-the-node-and-context-you-choose.adoc)
+[*Load a model on the node and context you choose*](https://thinkube.github.io/thinkube.org/thinkube-docs/playbooks/load-a-model-on-the-node-and-context-you-choose.html)
 explains the steps.
 
 ### 4. Use the API
