@@ -104,4 +104,4 @@ TEI is built in Rust with optimized CUDA kernels, providing:
 
 ## License
 
-Apache 2.0
+MIT. Code generated from this template is yours: no attribution required, and you may license the app you build however you choose. See [LICENSE](LICENSE).
