@@ -20,37 +20,38 @@ This template deploys an embedding server using:
 
 ## Usage
 
-### 1. Build TEI Base Image
+This repository is not deployed from the Templates page. It is the
+`text-embeddings` optional component. The TEI base image it runs on is
+built by the Thinkube installer.
 
-First, build the TEI base image (one-time, ~15-30 minutes):
-```bash
-./scripts/tk_ansible ansible/40_thinkube/core/harbor-images/14_build_base_images.yaml
-```
+### 1. Install the component
 
-### 2. Download Model
+In thinkube-control, open *Optional Components* and install *Text
+Embeddings*. This deploys the component with no pods.
 
-Download the embedding model using thinkube-control Model Catalog:
-- Navigate to Models in thinkube-control
-- Select an embedding model (e.g., `nomic-ai/nomic-embed-text-v1.5`)
-- Click "Download" to mirror to MLflow
+### 2. Download a model
 
-### 3. Deploy Template
+In thinkube-control, open the model catalogue, select an embedding model
+(for example `nomic-ai/nomic-embed-text-v1.5`) and download it. It is
+mirrored once into MLflow.
 
-Deploy this template via thinkube-control:
-- Select `tkt-text-embeddings` template
-- Choose the downloaded model
-- Deploy
+### 3. Load the model
+
+Load the model on the node you choose. The LLM Gateway creates the serving
+pod and registers the model. The docs page *Load a model on the node and
+context you choose* explains the steps.
 
 ### 4. Use the API
 
-The server exposes an OpenAI-compatible embedding endpoint:
+The model is served through the LLM Gateway at `llm.<your-domain>`, with an
+OpenAI-compatible embeddings endpoint:
 
 ```python
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="https://your-deployment.your-domain.com",
-    api_key="not-needed"
+    base_url="https://llm.<your-domain>/v1",
+    api_key="<your Thinkube API token>"
 )
 
 response = client.embeddings.create(
