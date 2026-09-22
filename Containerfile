@@ -1,3 +1,6 @@
+# Copyright Alejandro Martínez Corriá and the Thinkube contributors
+# SPDX-License-Identifier: MIT
+
 ARG CONTAINER_REGISTRY
 FROM ${CONTAINER_REGISTRY}/library/text-embeddings-base:latest
 

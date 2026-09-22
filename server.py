@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+
+# Copyright Alejandro Martínez Corriá and the Thinkube contributors
+# SPDX-License-Identifier: MIT
+
 """
 Text Embeddings Server with Gradio UI and Admin Management Endpoints
 Uses TEI (text-embeddings-router) as a subprocess for model switching support.
