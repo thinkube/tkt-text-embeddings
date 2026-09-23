@@ -12,3 +12,8 @@ metadata:
   tags: ["ai", "embeddings", "rag", "text-embeddings", "tei", "huggingface"]
 
 parameters: []
+
+secrets:
+  - name: HF_TOKEN
+    description: Hugging Face API token — required at runtime for gated models
+    required: false
