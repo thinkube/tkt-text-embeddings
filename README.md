@@ -62,7 +62,7 @@ Embeddings*. This deploys the component with no pods.
 ### 2. Download a model
 
 In thinkube-control, open the model catalogue, select an embedding model
-(for example `nomic-ai/nomic-embed-text-v1.5`) and download it. It is
+(for example `Qwen/Qwen3-Embedding-0.6B`) and download it. It is
 mirrored once into MLflow.
 
 ### 3. Load the model
@@ -86,7 +86,7 @@ client = OpenAI(
 )
 
 response = client.embeddings.create(
-    model="nomic-ai/nomic-embed-text-v1.5",
+    model="Qwen/Qwen3-Embedding-0.6B",
     input=["Hello, world!", "This is a test."]
 )
 
@@ -101,24 +101,9 @@ These are the models the model catalogue
 marks for this component. A model that is not in the catalogue cannot be
 mirrored or served.
 
-### General Purpose
-| Model | Size | Dimensions | Context | License |
-|-------|------|------------|---------|---------|
-| nomic-ai/nomic-embed-text-v1.5 | ~550MB | 768 | 8192 | Apache 2.0 |
-| BAAI/bge-base-en-v1.5 | ~440MB | 768 | 512 | MIT |
-| BAAI/bge-large-en-v1.5 | ~1.3GB | 1024 | 512 | MIT |
-| Alibaba-NLP/gte-large-en-v1.5 | ~1.6GB | 1024 | 8192 | Apache 2.0 |
-
-### Code-Specific
-| Model | Size | Dimensions | Context | License |
-|-------|------|------------|---------|---------|
-| jinaai/jina-embeddings-v2-base-code | ~560MB | 768 | 8192 | Apache 2.0 |
-
-### Multilingual
 | Model | Parameters | Dimensions | Context | License |
 |-------|------------|------------|---------|---------|
 | Qwen/Qwen3-Embedding-0.6B | 0.6B | 1024 | 8192 | Apache 2.0 |
-| Qwen/Qwen3-Embedding-4B | 4B | 2560 | 8192 | Apache 2.0 |
 
 ## API Endpoints
 
