@@ -1,0 +1,26 @@
+# Copyright Alejandro Martínez Corriá and the Thinkube contributors
+# SPDX-License-Identifier: MIT
+
+ARG CONTAINER_REGISTRY
+FROM ${CONTAINER_REGISTRY}/library/text-embeddings-base:latest
+
+# Copy application files
+COPY entrypoint.sh /app/entrypoint.sh
+COPY server.py /app/server.py
+COPY thinkube_theme.py /app/thinkube_theme.py
+RUN chmod +x /app/entrypoint.sh
+
+# Copy assets
+COPY tk_ai.png /app/icons/tk_ai.png
+COPY tk_ai.svg /app/icons/tk_ai.svg
+
+# Create non-root user (matching UID from base image)
+RUN useradd -m -u 1001 tei || true
+USER tei
+WORKDIR /app
+
+# Expose ports: 8355 for TEI API, 7860 for Gradio UI
+EXPOSE 8355 7860
+
+# Run the entrypoint script
+ENTRYPOINT ["/app/entrypoint.sh"]
