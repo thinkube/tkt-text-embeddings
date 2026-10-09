@@ -138,10 +138,13 @@ def start_backend(model_path: str, model_id: str) -> subprocess.Popen:
     return proc
 
 
-def wait_for_backend(timeout: int = 120) -> bool:
-    """Wait for TEI to become healthy."""
+def wait_for_backend(proc: subprocess.Popen, timeout: int = 120) -> bool:
+    """Wait for TEI to become healthy; False at once if it exits."""
     start = time.time()
     while time.time() - start < timeout:
+        if proc.poll() is not None:
+            logger.error(f"TEI exited with code {proc.returncode} before it became healthy")
+            return False
         try:
             r = req_lib.get(f"{TEI_BACKEND_URL}/health", timeout=5)
             if r.status_code == 200:
@@ -182,9 +185,9 @@ def _do_auto_load(model_id: str):
         model_path = query_mlflow(model_id)
         logger.info(f"Resolved model path: {model_path}")
 
-        start_backend(model_path, model_id)
+        proc = start_backend(model_path, model_id)
 
-        if not wait_for_backend(timeout=120):
+        if not wait_for_backend(proc, timeout=120):
             logger.error(f"Auto-load failed: {model_id} did not become healthy")
             is_switching = False
             return
@@ -288,30 +291,40 @@ async def admin_switch_model(request: Request):
         os.environ["MODEL_ID"] = new_model_id
         os.environ["MODEL_PATH"] = new_model_path
 
-        start_backend(new_model_path, new_model_id)
+        proc = start_backend(new_model_path, new_model_id)
 
-        if not wait_for_backend(timeout=120):
+        if not wait_for_backend(proc, timeout=120):
             logger.error(f"Failed to start TEI for {new_model_id}, rolling back...")
             stop_backend()
             MODEL_ID = previous_model
             MODEL_PATH = previous_path
             if previous_model and previous_path:
+                # Restart the model that was serving. If it does not come
+                # back either, nothing is served and the answer says so.
+                rollback_error = None
                 try:
                     os.environ["MODEL_ID"] = previous_model
                     os.environ["MODEL_PATH"] = previous_path
-                    start_backend(previous_path, previous_model)
-                    wait_for_backend(timeout=120)
-                    logger.info("Rollback succeeded")
-                except Exception as rollback_err:
-                    logger.error(f"Rollback also failed: {rollback_err}")
+                    proc = start_backend(previous_path, previous_model)
+                    if wait_for_backend(proc, timeout=120):
+                        logger.info(f"Rollback to {previous_model} succeeded")
+                    else:
+                        rollback_error = f"{previous_model} did not become healthy again"
+                except Exception as e:
+                    rollback_error = str(e)
+                if rollback_error:
+                    logger.error(f"Rollback failed: {rollback_error}")
+                    stop_backend()
+                    MODEL_ID = None
+                    MODEL_PATH = None
 
             is_switching = False
             backend_start_time = time.time() if MODEL_ID else None
             return JSONResponse(status_code=500, content={
                 "previous_model": previous_model,
                 "current_model": MODEL_ID,
-                "status": "serving",
-                "error": f"Failed to load {new_model_id}: backend did not become healthy within timeout"
+                "status": "serving" if MODEL_ID else "idle",
+                "error": f"Failed to load {new_model_id}: TEI exited or did not become healthy within the timeout"
             })
 
         backend_start_time = time.time()
