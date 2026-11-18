@@ -19,6 +19,12 @@ to it.
   start.
 - **It gives an OpenAI-compatible API.** `POST /v1/embeddings` takes
   `input` (a string or a list) and returns OpenAI-style embeddings.
+- **It reranks, when the loaded model is a reranker.** `POST /v1/rerank`
+  takes `query` and `documents` (strings, or objects with `text`), and
+  optionally `top_n` and `return_documents`. It answers `results`, best
+  first, each with the document's `index` in the request and its
+  `relevance_score` from 0 to 1: the shape most rerank APIs share. A pod
+  serves one model, so an embedding model and a reranker are two loads.
 - **It has a test page.** A Gradio page at `/` shows the vector of one text,
   or the cosine similarity of two texts.
 

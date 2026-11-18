@@ -414,6 +414,73 @@ async def openai_embeddings(request: Request):
         )
 
 
+# The texts one TEI rerank request may carry (TEI's own limit on a client batch).
+RERANK_BATCH = 32
+
+
+def rerank_texts(documents) -> list[str]:
+    """The texts of a rerank request's documents: each a string, or an object with a `text` field."""
+    texts = []
+    for n, document in enumerate(documents):
+        text = document.get("text") if isinstance(document, dict) else document
+        if not isinstance(text, str):
+            raise ValueError(f"document {n} is neither a string nor an object with a text field")
+        texts.append(text)
+    return texts
+
+
+@app.post("/v1/rerank")
+async def rerank(request: Request):
+    """Score documents against a query with the loaded reranker model, best first.
+
+    The request and the answer have the shape most rerank APIs share (Cohere, Jina, vLLM): `query`, `documents`
+    (strings, or objects with `text`), optional `top_n` and `return_documents`; the answer is `results`, each with
+    the document's `index` in the request and its `relevance_score` from 0 to 1.
+    """
+    if MODEL_ID is None:
+        return JSONResponse(status_code=503, content={"error": {"message": "No model loaded", "type": "service_unavailable"}})
+    try:
+        body = await request.json()
+        query = body.get("query")
+        documents = body.get("documents")
+        if not isinstance(query, str) or not query.strip():
+            raise ValueError("query is required: the text the documents are scored against")
+        if not isinstance(documents, list) or not documents:
+            raise ValueError("documents is required: a list of the texts to score")
+        texts = rerank_texts(documents)
+        top_n = body.get("top_n")
+        if top_n is not None and (not isinstance(top_n, int) or top_n < 1):
+            raise ValueError("top_n is a whole number, 1 or more")
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"error": {"message": str(e), "type": "invalid_request_error"}})
+
+    scores: list[tuple[int, float]] = []
+    for start in range(0, len(texts), RERANK_BATCH):
+        batch = texts[start:start + RERANK_BATCH]
+        try:
+            response = await http_client.post("/rerank", json={"query": query, "texts": batch, "truncate": True},
+                                              timeout=120)
+        except Exception as e:
+            return JSONResponse(status_code=503, content={"error": {"message": f"TEI backend error: {e}", "type": "backend_error"}})
+        if response.status_code != 200:
+            # TEI says so when the loaded model is not a reranker; its own words are passed on.
+            return JSONResponse(status_code=response.status_code if response.status_code < 500 else 502, content={
+                "error": {"message": f"{MODEL_ID} did not rerank: {response.text[:300]}", "type": "backend_error"}})
+        scores.extend((start + item["index"], item["score"]) for item in response.json())
+
+    scores.sort(key=lambda pair: pair[1], reverse=True)
+    if top_n is not None:
+        scores = scores[:top_n]
+    results = []
+    for index, score in scores:
+        result = {"index": index, "relevance_score": score}
+        if body.get("return_documents"):
+            result["document"] = {"text": texts[index]}
+        results.append(result)
+    return JSONResponse({"id": f"rerank-{int(time.time() * 1000)}", "model": MODEL_ID, "results": results,
+                         "usage": {"total_tokens": 0}})
+
+
 @app.get("/v1/models")
 async def openai_models():
     """OpenAI-compatible models endpoint."""
@@ -475,10 +542,26 @@ def compare_texts(text1: str, text2: str) -> tuple[str, str, str]:
         return f"Error: {str(e)}", "", ""
 
 
+def rerank_passages(query: str, passages: str) -> str:
+    """Score each line of passages against the query, best first; needs a reranker model."""
+    if MODEL_ID is None:
+        return "No model loaded"
+    texts = [line.strip() for line in passages.splitlines() if line.strip()]
+    if not query.strip() or not texts:
+        return "Enter a query and at least one passage, one per line"
+    try:
+        response = sync_http_client.post("/rerank", json={"query": query, "texts": texts, "truncate": True})
+        if response.status_code != 200:
+            return f"{MODEL_ID} did not rerank: {response.text[:300]}"
+        return "\n".join(f"{item['score']:.4f}  {texts[item['index']]}" for item in response.json())
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+
 thinkube_theme = create_thinkube_theme()
 
 with gr.Blocks() as demo:
-    gr.Markdown("# Text Embeddings")
+    gr.Markdown("# Text Embeddings and Reranking")
     gr.Markdown(f"Model: **{MODEL_ID or 'none (idle)'}**")
 
     with gr.Tabs():
@@ -503,6 +586,14 @@ with gr.Blocks() as demo:
                 dim_output = gr.Textbox(label="Info")
             compare_btn.click(compare_texts, inputs=[text1, text2],
                             outputs=[similarity_output, interpretation_output, dim_output])
+
+        with gr.TabItem("Rerank"):
+            gr.Markdown("For a reranker model: scores each passage against the query, best first.")
+            rerank_query = gr.Textbox(label="Query", placeholder="What the passages should answer...", lines=2)
+            rerank_input = gr.Textbox(label="Passages, one per line", lines=6)
+            rerank_btn = gr.Button("Rerank", variant="primary")
+            rerank_output = gr.Textbox(label="Score and passage, best first", lines=8)
+            rerank_btn.click(rerank_passages, inputs=[rerank_query, rerank_input], outputs=[rerank_output])
 
 app = gr.mount_gradio_app(
     app,
